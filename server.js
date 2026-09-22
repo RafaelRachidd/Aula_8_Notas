@@ -1,83 +1,169 @@
-// Importa o Express, Body-Parser e FS
+// Importa Express, CORS e FS
 const express = require('express');
-const bodyParser = require('body-parser');
+const cors = require('cors');
 const fs = require('fs');
-const app = express();
-const PORT = 3000;
-const FILE = 'data.json';
-// Permite receber JSON
-app.use(bodyParser.json());
 
-// Libera acesso externo (CORS)
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  next();
-});
-// Função para ler arquivo
+const app = express();
+
+// No Render usa a porta fornecida pelo servidor.
+// Localmente usa a porta 3000.
+const PORT = process.env.PORT || 3000;
+
+const FILE = 'data.json';
+
+
+// ======================================
+// MIDDLEWARES
+// ======================================
+
+// Libera o acesso do frontend
+app.use(cors());
+
+// Permite receber JSON
+app.use(express.json());
+
+
+// ======================================
+// FUNÇÃO PARA LER AS NOTAS
+// ======================================
+
 function readNotes() {
   try {
-    const data = fs.readFileSync(FILE);
+    const data = fs.readFileSync(FILE, 'utf8');
+
     return JSON.parse(data);
-  } catch {
+
+  } catch (erro) {
+
+    console.log('Erro ao ler arquivo:', erro.message);
+
     return [];
   }
 }
-// Função para salvar arquivo
+
+
+// ======================================
+// FUNÇÃO PARA SALVAR AS NOTAS
+// ======================================
+
 function saveNotes(notes) {
-  fs.writeFileSync(FILE, JSON.stringify(notes, null, 2));
+  fs.writeFileSync(
+    FILE,
+    JSON.stringify(notes, null, 2)
+  );
 }
-// GET - Listar notas
+
+
+// ======================================
+// GET - LISTAR NOTAS
+// ======================================
+
 app.get('/api/notes', (req, res) => {
+
   const notes = readNotes();
+
   res.json(notes);
+
 });
-// ====================
-// POST - Criar nota
-// ====================
+
+
+// ======================================
+// POST - CRIAR NOTA
+// ======================================
+
 app.post('/api/notes', (req, res) => {
+
   const notes = readNotes();
 
   const novaNota = {
     id: Date.now().toString(),
     titulo: req.body.titulo,
-    texto: req.body.texto
+    texto: req.body.texto,
+    criadoEm: new Date().toISOString()
   };
 
   notes.push(novaNota);
+
   saveNotes(notes);
 
-  res.json(novaNota);
+  res.status(201).json(novaNota);
+
 });
-// ====================
-// PUT - Editar nota
-// ====================
+
+
+// ======================================
+// PUT - EDITAR NOTA
+// ======================================
+
 app.put('/api/notes/:id', (req, res) => {
+
   const notes = readNotes();
 
-  const index = notes.findIndex(n => n.id === req.params.id);
+  const index = notes.findIndex(
+    nota => nota.id === req.params.id
+  );
 
   if (index >= 0) {
+
     notes[index].titulo = req.body.titulo;
     notes[index].texto = req.body.texto;
+
     saveNotes(notes);
+
     res.json(notes[index]);
+
   } else {
-    res.status(404).json({ erro: 'Nota não encontrada' });
+
+    res.status(404).json({
+      erro: 'Nota não encontrada'
+    });
+
   }
+
 });
-// ====================
-// DELETE - Excluir nota
-// ====================
+
+
+// ======================================
+// DELETE - EXCLUIR NOTA
+// ======================================
+
 app.delete('/api/notes/:id', (req, res) => {
+
   const notes = readNotes();
 
-  const novasNotas = notes.filter(n => n.id !== req.params.id);
+  const notaExiste = notes.some(
+    nota => nota.id === req.params.id
+  );
+
+  if (!notaExiste) {
+
+    return res.status(404).json({
+      erro: 'Nota não encontrada'
+    });
+
+  }
+
+  const novasNotas = notes.filter(
+    nota => nota.id !== req.params.id
+  );
 
   saveNotes(novasNotas);
 
-  res.json({ mensagem: 'Nota removida' });
+  res.json({
+    mensagem: 'Nota removida com sucesso'
+  });
+
 });
-// Inicia servidor
+
+
+// ======================================
+// INICIA O SERVIDOR
+// ======================================
+
 app.listen(PORT, () => {
-  console.log('Servidor rodando em http://localhost:3000');
+
+  console.log(
+    `Servidor rodando na porta ${PORT}`
+  );
+
 });
